@@ -9,11 +9,11 @@
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gradient-to-br from-slate-50 via-white to-slate-100 min-h-screen">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center py-4">
+    <nav class="bg-white/95 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-40">
+        <div class="max-w-full px-8">
+            <div class="flex justify-between items-center py-5">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
                         <div class="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100">
@@ -22,115 +22,104 @@
                             </svg>
                         </div>
                     </div>
-                    <h1 class="ml-3 text-xl font-semibold text-gray-900">Tambah Transaksi</h1>
+                    <h1 class="ml-4 text-2xl font-bold text-slate-900 tracking-tight">Tambah Transaksi</h1>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <a href="home.html" class="text-gray-500 hover:text-gray-700 text-sm font-medium">Kembali ke Dashboard</a>
-                    <a href="settings.html" class="text-gray-500 hover:text-gray-700 text-sm font-medium">Settings</a>
+                <div class="flex items-center space-x-6">
+                    <a href="home.html" class="text-slate-600 hover:text-slate-900 text-sm font-semibold transition-colors">Kembali ke Dashboard</a>
+                    <a href="settings.html" class="text-slate-600 hover:text-slate-900 text-sm font-semibold transition-colors">Pengaturan</a>
                 </div>
             </div>
         </div>
     </nav>
 
-    <div class="max-w-2xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-6">Form Transaksi Baru</h3>
+    <div class="max-w-6xl mx-auto py-12 px-8">
+        <div class="bg-white/80 backdrop-blur border border-slate-200/60 rounded-3xl shadow-xl shadow-slate-200/20">
+            <div class="px-8 py-8">
+                <h3 class="text-2xl font-bold text-slate-900 mb-8 tracking-tight">Form Transaksi Baru</h3>
                 
-                <form id="transactionForm" class="space-y-6">
+                <form id="transactionForm" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- Transaction Name (Auto-populated from Category) -->
                     <div>
-                        <label for="transactionName" class="block text-sm font-medium text-gray-700">Nama Transaksi</label>
-                        <input type="text" id="transactionName" required readonly class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm" placeholder="Pilih kategori untuk mengisi nama otomatis">
-                        <p class="mt-1 text-sm text-gray-500">Nama akan terisi otomatis berdasarkan kategori yang dipilih</p>
+                        <label for="transactionName" class="block text-sm font-semibold text-slate-700 mb-2">Nama Transaksi</label>
+                        <input type="text" id="transactionName" required readonly class="w-full px-4 py-3 border border-slate-200 rounded-xl shadow-sm bg-slate-50/70 text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all" placeholder="Pilih kategori untuk mengisi nama otomatis">
+                        <p class="mt-2 text-sm text-slate-500 font-medium">Nama akan terisi otomatis berdasarkan kategori yang dipilih</p>
                     </div>
 
                     <!-- Date -->
                     <div>
-                        <label for="transactionDate" class="block text-sm font-medium text-gray-700">Tanggal</label>
-                        <input type="date" id="transactionDate" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <label for="transactionDate" class="block text-sm font-semibold text-slate-700 mb-2">Tanggal</label>
+                        <input type="date" id="transactionDate" required class="w-full px-4 py-3 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all bg-white">
                     </div>
 
                     <!-- Category Selection -->
-                    <div class="space-y-4">
-                        <label class="block text-sm font-medium text-gray-700">Kategori Transaksi</label>
+                    <div class="space-y-4 lg:col-span-2">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Kategori Transaksi</label>
                         
                         <!-- Level 1 -->
                         <div>
-                            <select id="category1" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <select id="category1" class="w-full px-4 py-3 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all bg-white">
                                 <option value="">Pilih Kategori Utama</option>
                             </select>
                         </div>
 
                         <!-- Level 2 -->
                         <div id="category2Container" class="hidden">
-                            <select id="category2" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <select id="category2" class="w-full px-4 py-3 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all bg-white">
                                 <option value="">Pilih Sub Kategori</option>
                             </select>
                         </div>
 
                         <!-- Level 3 -->
                         <div id="category3Container" class="hidden">
-                            <select id="category3" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                <option value="">Pilih Sub Kategori</option>
-                            </select>
-                        </div>
-
-                        <!-- Level 4 -->
-                        <div id="category4Container" class="hidden">
-                            <select id="category4" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                <option value="">Pilih Sub Kategori</option>
-                            </select>
-                        </div>
 
                         <!-- Level 5 -->
                         <div id="category5Container" class="hidden">
-                            <select id="category5" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <select id="category5" class="w-full px-4 py-3 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all bg-white">
                                 <option value="">Pilih Sub Kategori</option>
                             </select>
                         </div>
                     </div>
 
                     <!-- Selected Category Display -->
-                    <div id="selectedCategoryDisplay" class="hidden">
-                        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
-                            <h4 class="text-sm font-medium text-blue-900">Kategori Terpilih:</h4>
-                            <p id="selectedCategoryText" class="text-sm text-blue-700 mt-1"></p>
+                    <div id="selectedCategoryDisplay" class="hidden lg:col-span-2">
+                        <div class="bg-blue-50/80 backdrop-blur border border-blue-200 rounded-2xl p-6">
+                            <h4 class="text-sm font-semibold text-blue-900">Kategori Terpilih:</h4>
+                            <p id="selectedCategoryText" class="text-sm text-blue-700 mt-1 font-medium"></p>
                         </div>
                     </div>
 
                     <!-- Amount Input -->
                     <div>
-                        <label for="amount" class="block text-sm font-medium text-gray-700">Jumlah (IDR)</label>
-                        <div class="mt-1 relative rounded-md shadow-sm">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <span class="text-gray-500 sm:text-sm">Rp</span>
+                        <label for="amount" class="block text-sm font-semibold text-slate-700 mb-2">Jumlah (IDR)</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <span class="text-slate-500 font-medium">Rp</span>
                             </div>
-                            <input type="number" id="amount" required class="block w-full pl-8 pr-12 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="0">
+                            <input type="number" id="amount" required class="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all bg-white" placeholder="0">
                         </div>
                     </div>
 
                     <!-- Account Selection -->
                     <div>
-                        <label for="accountId" class="block text-sm font-medium text-gray-700">Pilih Akun</label>
-                        <select id="accountId" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <label for="accountId" class="block text-sm font-semibold text-slate-700 mb-2">Pilih Akun</label>
+                        <select id="accountId" required class="w-full px-4 py-3 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all bg-white">
                             <option value="">Pilih Akun</option>
                             <!-- Account options will be populated dynamically -->
                         </select>
                     </div>
 
                     <!-- Description -->
-                    <div>
-                        <label for="description" class="block text-sm font-medium text-gray-700">Keterangan (Opsional)</label>
-                        <textarea id="description" rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Keterangan tambahan transaksi..."></textarea>
+                    <div class="lg:col-span-2">
+                        <label for="description" class="block text-sm font-semibold text-slate-700 mb-2">Keterangan (Opsional)</label>
+                        <textarea id="description" rows="4" class="w-full px-4 py-3 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all bg-white resize-none" placeholder="Keterangan tambahan transaksi..."></textarea>
                     </div>
 
                     <!-- Submit Button -->
-                    <div class="flex justify-end space-x-3">
-                        <a href="home.html" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <div class="lg:col-span-2 flex justify-end space-x-4 pt-4">
+                        <a href="home.html" class="bg-white/80 backdrop-blur py-3 px-6 border border-slate-200 rounded-xl shadow-sm text-sm font-semibold text-slate-700 hover:bg-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all">
                             Batal
                         </a>
-                        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <button type="submit" class="inline-flex justify-center py-3 px-8 border border-transparent shadow-lg text-sm font-semibold rounded-xl text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all transform hover:-translate-y-0.5 hover:shadow-xl">
                             Simpan Transaksi
                         </button>
                     </div>

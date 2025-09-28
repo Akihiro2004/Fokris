@@ -220,15 +220,16 @@ const displaySaldoAwalOnly = () => {
         const monthName = date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
         
         transactionHTML += `
-            <li class="px-6 py-3 bg-gray-100 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-800">${monthName}</h3>
+            <li class="px-8 py-4 bg-slate-100/70 border-b border-slate-200">
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">${monthName}</h3>
             </li>
         `;
         
         transactionHTML += `
-            <li class="px-6 py-4 bg-green-50 border-l-4 border-green-400 ${monthIndex < filteredMonths.length - 1 ? 'mb-6' : ''}">
-                <div class="flex items-center justify-between">
-                    <div class="flex-1 min-w-0">
+            <li class="px-8 py-4 bg-green-50 border-l-4 border-green-400 ${monthIndex < filteredMonths.length - 1 ? 'mb-6' : ''}">
+                <div class="grid grid-cols-12 gap-4 items-center">
+                    <!-- Saldo Info - 10 columns -->
+                    <div class="col-span-10">
                         <h4 class="text-sm font-semibold text-green-900">
                             Saldo Awal
                         </h4>
@@ -239,9 +240,11 @@ const displaySaldoAwalOnly = () => {
                             Posisi awal bulan
                         </p>
                     </div>
-                    <div class="text-right">
-                        <div class="font-bold text-green-900 text-xl">${formatCurrency(saldoAwal)}</div>
-                        <div class="text-xs text-green-600 font-medium">Saldo Kas</div>
+                    
+                    <!-- Saldo Kas - 2 columns -->
+                    <div class="col-span-2 text-right">
+                        <div class="font-bold text-green-900 text-lg">${formatCurrency(saldoAwal)}</div>
+                        <div class="text-xs text-green-600 font-medium mt-0.5">Saldo Kas</div>
                     </div>
                 </div>
             </li>
@@ -294,16 +297,44 @@ const displayTransactions = () => {
         
         // Add month header
         transactionHTML += `
-            <li class="px-6 py-3 bg-gray-100 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-800">${monthName}</h3>
+            <li class="px-8 py-4 bg-slate-100/70 border-b border-slate-200">
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">${monthName}</h3>
+            </li>
+        `;
+        
+        // Add column headers for this month
+        transactionHTML += `
+            <li class="px-8 py-3 bg-slate-50/50 border-b border-slate-200/50">
+                <div class="grid grid-cols-12 gap-4 items-center">
+                    <!-- Transaction Info - 6 columns -->
+                    <div class="col-span-6">
+                        <div class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Transaksi & Detail</div>
+                    </div>
+                    
+                    <!-- Akun - 2 columns -->
+                    <div class="col-span-2 text-center">
+                        <div class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Akun</div>
+                    </div>
+                    
+                    <!-- Jumlah - 2 columns -->
+                    <div class="col-span-2 text-right">
+                        <div class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Jumlah</div>
+                    </div>
+                    
+                    <!-- Saldo Kas - 2 columns -->
+                    <div class="col-span-2 text-right">
+                        <div class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Saldo Kas</div>
+                    </div>
+                </div>
             </li>
         `;
         
         // Add Saldo Akhir (at top of month)
         transactionHTML += `
-            <li class="px-6 py-4 bg-blue-50 border-l-4 border-blue-400">
-                <div class="flex items-center justify-between">
-                    <div class="flex-1 min-w-0">
+            <li class="px-8 py-4 bg-blue-50 border-l-4 border-blue-400">
+                <div class="grid grid-cols-12 gap-4 items-center">
+                    <!-- Saldo Info - 10 columns -->
+                    <div class="col-span-10">
                         <h4 class="text-sm font-semibold text-blue-900">
                             Saldo Akhir
                         </h4>
@@ -314,9 +345,11 @@ const displayTransactions = () => {
                             Posisi akhir bulan
                         </p>
                     </div>
-                    <div class="text-right">
-                        <div class="font-bold text-blue-900 text-xl">${formatCurrency(saldoAkhir)}</div>
-                        <div class="text-xs text-blue-600 font-medium">Saldo Kas</div>
+                    
+                    <!-- Saldo Kas - 2 columns -->
+                    <div class="col-span-2 text-right">
+                        <div class="font-bold text-blue-900 text-lg">${formatCurrency(saldoAkhir)}</div>
+                        <div class="text-xs text-blue-600 font-medium mt-0.5">Saldo Kas</div>
                     </div>
                 </div>
             </li>
@@ -363,37 +396,38 @@ const displayTransactions = () => {
                 : '-';
             
             transactionHTML += `
-                <li class="px-6 py-4 hover:bg-gray-50 transition duration-150 ease-in-out border-l-4 border-transparent hover:border-gray-300">
-                    <div class="flex items-center justify-between">
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center justify-between">
-                                <div class="flex-1">
-                                    <h4 class="text-sm font-medium text-gray-900 truncate">
-                                        ${transaction.name || 'Transaksi'}
-                                    </h4>
-                                    <p class="text-sm text-gray-600 truncate">
-                                        ${categoryName}
-                                    </p>
-                                    <p class="text-xs text-gray-500">
-                                        ${formatDate(transaction.date)} | ${accountName}
-                                    </p>
-                                    ${transaction.description ? `<p class="text-xs text-gray-400 mt-1">${transaction.description}</p>` : ''}
-                                </div>
-                                <div class="grid grid-cols-3 gap-4 text-right text-sm">
-                                    <div>
-                                        <div class="font-medium text-gray-900">${accountName}</div>
-                                        <div class="text-xs text-gray-500">Akun</div>
-                                    </div>
-                                    <div>
-                                        <div class="font-medium ${isExpense ? 'text-red-600' : isIncome ? 'text-green-600' : 'text-gray-900'}">${amountDisplay}</div>
-                                        <div class="text-xs text-gray-500">Jumlah</div>
-                                    </div>
-                                    <div>
-                                        <div class="font-medium text-blue-600">${saldoKasDisplay}</div>
-                                        <div class="text-xs text-gray-500">Saldo Kas</div>
-                                    </div>
-                                </div>
-                            </div>
+                <li class="px-8 py-4 hover:bg-gray-50 transition duration-150 ease-in-out border-l-4 border-transparent hover:border-gray-300">
+                    <div class="grid grid-cols-12 gap-4 items-center">
+                        <!-- Transaction Info - 6 columns -->
+                        <div class="col-span-6">
+                            <h4 class="text-sm font-medium text-gray-900 truncate">
+                                ${transaction.name || 'Transaksi'}
+                            </h4>
+                            <p class="text-sm text-gray-600 truncate">
+                                ${categoryName}
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                ${formatDate(transaction.date)}
+                            </p>
+                            ${transaction.description ? `<p class="text-xs text-gray-400 mt-1 truncate">${transaction.description}</p>` : ''}
+                        </div>
+                        
+                        <!-- Akun - 2 columns -->
+                        <div class="col-span-2 text-center">
+                            <div class="font-medium text-gray-900 text-sm truncate">${accountName}</div>
+                            <div class="text-xs text-gray-500 mt-0.5">Akun</div>
+                        </div>
+                        
+                        <!-- Jumlah - 2 columns -->
+                        <div class="col-span-2 text-right">
+                            <div class="font-semibold text-sm ${isExpense ? 'text-red-600' : isIncome ? 'text-green-600' : 'text-gray-900'}">${amountDisplay}</div>
+                            <div class="text-xs text-gray-500 mt-0.5">Jumlah</div>
+                        </div>
+                        
+                        <!-- Saldo Kas - 2 columns -->
+                        <div class="col-span-2 text-right">
+                            <div class="font-semibold text-sm text-blue-600">${saldoKasDisplay}</div>
+                            <div class="text-xs text-gray-500 mt-0.5">Saldo Kas</div>
                         </div>
                     </div>
                 </li>
@@ -402,9 +436,10 @@ const displayTransactions = () => {
         
         // Add Saldo Awal (at bottom of month)
         transactionHTML += `
-            <li class="px-6 py-4 bg-green-50 border-l-4 border-green-400 ${monthIndex < sortedMonths.length - 1 ? 'mb-6' : ''}">
-                <div class="flex items-center justify-between">
-                    <div class="flex-1 min-w-0">
+            <li class="px-8 py-4 bg-green-50 border-l-4 border-green-400 ${monthIndex < sortedMonths.length - 1 ? 'mb-6' : ''}">
+                <div class="grid grid-cols-12 gap-4 items-center">
+                    <!-- Saldo Info - 10 columns -->
+                    <div class="col-span-10">
                         <h4 class="text-sm font-semibold text-green-900">
                             Saldo Awal
                         </h4>
@@ -415,9 +450,11 @@ const displayTransactions = () => {
                             Posisi awal bulan
                         </p>
                     </div>
-                    <div class="text-right">
-                        <div class="font-bold text-green-900 text-xl">${formatCurrency(saldoAwal)}</div>
-                        <div class="text-xs text-green-600 font-medium">Saldo Kas</div>
+                    
+                    <!-- Saldo Kas - 2 columns -->
+                    <div class="col-span-2 text-right">
+                        <div class="font-bold text-green-900 text-lg">${formatCurrency(saldoAwal)}</div>
+                        <div class="text-xs text-green-600 font-medium mt-0.5">Saldo Kas</div>
                     </div>
                 </div>
             </li>

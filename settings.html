@@ -9,11 +9,11 @@
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gradient-to-br from-slate-50 via-white to-slate-100 min-h-screen">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center py-4">
+    <nav class="bg-white/95 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-40">
+        <div class="max-w-full px-8">
+            <div class="flex justify-between items-center py-5">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
                         <div class="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100">
@@ -23,33 +23,33 @@
                             </svg>
                         </div>
                     </div>
-                    <h1 class="ml-3 text-xl font-semibold text-gray-900">Settings</h1>
+                    <h1 class="ml-4 text-2xl font-bold text-slate-900 tracking-tight">Pengaturan</h1>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <span id="userInfo" class="text-sm text-gray-500"></span>
-                    <a href="home.html" class="text-gray-500 hover:text-gray-700 text-sm font-medium">Dashboard</a>
+                <div class="flex items-center space-x-6">
+                    <span id="userInfo" class="text-sm text-slate-600 font-medium"></span>
+                    <a href="home.html" class="text-slate-600 hover:text-slate-900 text-sm font-semibold transition-colors">Dashboard</a>
                 </div>
             </div>
         </div>
     </nav>
 
-    <div class="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-full px-8 py-12">
         <!-- Account Information -->
-        <div class="bg-white shadow rounded-lg mb-6">
-            <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Informasi Akun</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white/80 backdrop-blur border border-slate-200/60 rounded-3xl shadow-xl shadow-slate-200/20 mb-8">
+            <div class="px-8 py-8">
+                <h3 class="text-xl font-bold text-slate-900 mb-6 tracking-tight">Informasi Akun</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Email</label>
-                        <p id="userEmail" class="mt-1 text-sm text-gray-900">-</p>
+                        <label class="block text-sm font-semibold text-slate-700">Email</label>
+                        <p id="userEmail" class="mt-2 text-base text-slate-900 font-medium">-</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Role</label>
-                        <p id="userRole" class="mt-1 text-sm text-gray-900">-</p>
+                        <label class="block text-sm font-semibold text-slate-700">Role</label>
+                        <p id="userRole" class="mt-2 text-base text-slate-900 font-medium">-</p>
                     </div>
                 </div>
-                <div class="mt-6">
-                    <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition duration-150 ease-in-out">
+                <div class="mt-8">
+                    <button onclick="logout()" class="bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-red-700 transition-all transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl">
                         Logout
                     </button>
                 </div>
@@ -57,11 +57,11 @@
         </div>
 
         <!-- Account Management (Admin Only) -->
-        <div id="accountSection" class="bg-white shadow rounded-lg mb-6" data-admin-only style="display: none;">
-            <div class="px-4 py-5 sm:p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">Manajemen Akun</h3>
-                    <button onclick="showAddAccountModal()" class="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition duration-150 ease-in-out">
+        <div id="accountSection" class="bg-white/80 backdrop-blur border border-slate-200/60 rounded-3xl shadow-xl shadow-slate-200/20 mb-8" data-admin-only style="display: none;">
+            <div class="px-8 py-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-slate-900 tracking-tight">Manajemen Akun</h3>
+                    <button onclick="showAddAccountModal()" class="bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl">
                         Tambah Akun
                     </button>
                 </div>
@@ -86,11 +86,11 @@
         </div>
 
         <!-- Category Management (Admin Only) -->
-        <div id="categorySection" class="bg-white shadow rounded-lg mb-6" data-admin-only style="display: none;">
-            <div class="px-4 py-5 sm:p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">Manajemen Kategori</h3>
-                    <button onclick="showAddCategoryModal()" class="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition duration-150 ease-in-out">
+        <div id="categorySection" class="bg-white/80 backdrop-blur border border-slate-200/60 rounded-3xl shadow-xl shadow-slate-200/20 mb-8" data-admin-only style="display: none;">
+            <div class="px-8 py-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-slate-900 tracking-tight">Manajemen Kategori</h3>
+                    <button onclick="showAddCategoryModal()" class="bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl">
                         Tambah Kategori
                     </button>
                 </div>
