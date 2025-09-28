@@ -60,6 +60,8 @@ const checkAuthAndRedirect = () => {
                         initializeTransactionForm();
                     } else if (typeof initializeSettingsPage === 'function') {
                         initializeSettingsPage();
+                    } else if (typeof initializeExtractPage === 'function') {
+                        initializeExtractPage();
                     }
                 }, 200);
                 

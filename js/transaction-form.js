@@ -128,8 +128,15 @@ const getMonthlyStartingBalance = async (currentDate) => {
         const monthlyBalanceDoc = await db.collection('monthlyBalances').doc(monthKey).get();
         
         if (monthlyBalanceDoc.exists) {
-            const endingBalance = monthlyBalanceDoc.data().endingBalance || 0;
+            const data = monthlyBalanceDoc.data();
+            const endingBalance = data.endingBalance || 0;
             console.log(`Found previous month balance for ${monthKey}: ${endingBalance}`);
+            
+            // Also log account balances if available
+            if (data.accountBalances) {
+                console.log(`Account balances for ${monthKey}:`, data.accountBalances);
+            }
+            
             return endingBalance;
         }
         
@@ -143,49 +150,95 @@ const getMonthlyStartingBalance = async (currentDate) => {
 };
 
 const promptForInitialBalance = async (previousMonthKey, currentDate) => {
-    return new Promise((resolve) => {
-        // Create modal HTML
-        const modalHTML = `
-            <div id="initialBalanceModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style="display: flex; align-items: center; justify-content: center;">
-                <div class="relative p-5 border w-96 shadow-lg rounded-md bg-white">
-                    <div class="mt-3">
-                        <div class="flex items-center mb-4">
-                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
-                                <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                                </svg>
+    return new Promise(async (resolve) => {
+        try {
+            // Get all active accounts first
+            const accountsSnapshot = await db.collection('accounts')
+                .where('isActive', '==', true)
+                .orderBy('createdAt')
+                .get();
+            
+            const accounts = [];
+            accountsSnapshot.forEach(doc => {
+                accounts.push({ id: doc.id, ...doc.data() });
+            });
+            
+            // Generate account input fields
+            let accountInputsHTML = '';
+            accounts.forEach(account => {
+                accountInputsHTML += `
+                    <div class="mb-4">
+                        <label for="balance_${account.id}" class="block text-sm font-medium text-gray-700 mb-2">${account.name}</label>
+                        <div class="relative rounded-md shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 sm:text-sm">Rp</span>
                             </div>
+                            <input type="number" id="balance_${account.id}" data-account-id="${account.id}" step="0.01" 
+                                   class="account-balance-input block w-full pl-8 pr-12 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" 
+                                   placeholder="0" oninput="updateTotalBalance()">
                         </div>
-                        <h3 class="text-lg font-medium text-gray-900 mb-4 text-center">Setup Saldo Awal</h3>
-                        <p class="text-sm text-gray-600 mb-4">
-                            Ini adalah transaksi pertama untuk bulan <strong>${new Intl.DateTimeFormat('id-ID', { year: 'numeric', month: 'long' }).format(currentDate)}</strong>.
-                            <br><br>
-                            Berapa Saldo Akhir bulan sebelumnya?
-                        </p>
-                        <form id="initialBalanceForm">
-                            <div class="mb-4">
-                                <label for="initialBalance" class="block text-sm font-medium text-gray-700 mb-2">Saldo Akhir Bulan Lalu (IDR)</label>
-                                <div class="relative rounded-md shadow-sm">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <span class="text-gray-500 sm:text-sm">Rp</span>
-                                    </div>
-                                    <input type="number" id="initialBalance" step="0.01" required class="block w-full pl-8 pr-12 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="0">
+                    </div>
+                `;
+            });
+            
+            // Create modal HTML
+            const modalHTML = `
+                <div id="initialBalanceModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style="display: flex; align-items: center; justify-content: center;">
+                    <div class="relative p-5 border w-120 max-w-2xl shadow-lg rounded-md bg-white max-h-96 overflow-y-auto">
+                        <div class="mt-3">
+                            <div class="flex items-center mb-4">
+                                <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                                    <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                                    </svg>
                                 </div>
-                                <p class="mt-1 text-xs text-gray-500">Masukkan saldo terakhir dari bulan sebelumnya. Ini akan menjadi Saldo Awal bulan ini.</p>
                             </div>
-                            <div class="flex justify-end space-x-3">
-                                <button type="button" id="cancelInitialBalance" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">
-                                    Batal
-                                </button>
-                                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-                                    Simpan
-                                </button>
-                            </div>
-                        </form>
+                            <h3 class="text-lg font-medium text-gray-900 mb-4 text-center">Setup Saldo Awal</h3>
+                            <p class="text-sm text-gray-600 mb-6">
+                                Ini adalah transaksi pertama untuk bulan <strong>${new Intl.DateTimeFormat('id-ID', { year: 'numeric', month: 'long' }).format(currentDate)}</strong>.
+                                <br><br>
+                                Masukkan saldo akhir bulan sebelumnya untuk setiap akun:
+                            </p>
+                            <form id="initialBalanceForm">
+                                <div class="space-y-4 mb-6">
+                                    ${accountInputsHTML}
+                                </div>
+                                
+                                <!-- Total Display -->
+                                <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-700">Total Saldo Kas:</span>
+                                        <span id="totalSaldoDisplay" class="text-lg font-bold text-blue-600">Rp 0</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">Total ini akan menjadi Saldo Awal bulan ini</p>
+                                </div>
+                                
+                                <div class="flex justify-end space-x-3">
+                                    <button type="button" id="cancelInitialBalance" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                        Batal
+                                    </button>
+                                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                                        Simpan
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+                
+                <script>
+                    // Function to update total balance display
+                    window.updateTotalBalance = function() {
+                        let total = 0;
+                        const inputs = document.querySelectorAll('.account-balance-input');
+                        inputs.forEach(input => {
+                            const value = parseFloat(input.value) || 0;
+                            total += value;
+                        });
+                        document.getElementById('totalSaldoDisplay').textContent = formatCurrency(total);
+                    };
+                </script>
+            `;
         
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         
@@ -197,24 +250,42 @@ const promptForInitialBalance = async (previousMonthKey, currentDate) => {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const initialBalance = parseFloat(document.getElementById('initialBalance').value) || 0;
-            
             try {
+                // Collect individual account balances from form inputs
+                const accountBalances = {};
+                let totalInitialBalance = 0;
+                
+                accounts.forEach(account => {
+                    const input = document.getElementById(`balance_${account.id}`);
+                    const balance = parseFloat(input.value) || 0;
+                    
+                    accountBalances[account.id] = {
+                        name: account.name,
+                        total: balance
+                    };
+                    
+                    totalInitialBalance += balance;
+                });
+                
+                console.log('Individual account balances:', accountBalances);
+                console.log('Total initial balance:', totalInitialBalance);
+                
                 // Save the initial balance as the previous month's ending balance
                 await db.collection('monthlyBalances').doc(previousMonthKey).set({
                     year: parseInt(previousMonthKey.split('-')[0]),
                     month: parseInt(previousMonthKey.split('-')[1]),
-                    endingBalance: initialBalance,
+                    endingBalance: totalInitialBalance,
+                    accountBalances: accountBalances,
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                     isInitialSetup: true
                 });
                 
-                console.log(`Initial balance ${initialBalance} saved for ${previousMonthKey}`);
+                console.log(`Initial balance ${formatCurrency(totalInitialBalance)} saved for ${previousMonthKey} with individual account breakdowns`);
                 
                 // Remove modal
                 modal.remove();
                 
-                resolve(initialBalance);
+                resolve(totalInitialBalance);
                 
             } catch (error) {
                 console.error('Error saving initial balance:', error);
@@ -227,7 +298,77 @@ const promptForInitialBalance = async (previousMonthKey, currentDate) => {
             modal.remove();
             resolve(0);
         });
+        
+        } catch (error) {
+            console.error('Error setting up initial balance modal:', error);
+            alert('Terjadi kesalahan saat memuat form: ' + error.message);
+            resolve(0);
+        }
     });
+};
+
+// Calculate account balances for a specific month
+const calculateMonthlyAccountBalances = async (year, month) => {
+    try {
+        // Get all transactions for the specified month
+        const monthStart = new Date(year, month - 1, 1);
+        const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
+        
+        const transactionsSnapshot = await db.collection('transactions')
+            .where('date', '>=', firebase.firestore.Timestamp.fromDate(monthStart))
+            .where('date', '<=', firebase.firestore.Timestamp.fromDate(monthEnd))
+            .get();
+        
+        // Get all active accounts
+        const accountsSnapshot = await db.collection('accounts')
+            .where('isActive', '==', true)
+            .get();
+        
+        // Initialize account balances
+        const accountBalances = {};
+        accountsSnapshot.forEach(doc => {
+            const account = { id: doc.id, ...doc.data() };
+            accountBalances[account.id] = {
+                name: account.name,
+                total: 0
+            };
+        });
+        
+        // Process transactions and calculate balances
+        transactionsSnapshot.forEach(doc => {
+            const transaction = doc.data();
+            const categoryId = transaction.categoryId;
+            const accountId = transaction.accountId;
+            const amount = transaction.amount || 0;
+            
+            if (accountBalances[accountId]) {
+                // Get category to determine transaction type
+                const category = getCategoryById(categoryId);
+                if (category) {
+                    let adjustedAmount = amount;
+                    
+                    if (category.index.startsWith('2')) {
+                        // Income - positive
+                        adjustedAmount = Math.abs(amount);
+                    } else if (category.index.startsWith('3')) {
+                        // Expense - negative
+                        adjustedAmount = -Math.abs(amount);
+                    } else {
+                        // Other categories (like Saldo Awal) - use as is
+                        adjustedAmount = amount;
+                    }
+                    
+                    accountBalances[accountId].total += adjustedAmount;
+                }
+            }
+        });
+        
+        return accountBalances;
+        
+    } catch (error) {
+        console.error('Error calculating monthly account balances:', error);
+        return {};
+    }
 };
 
 const updateMonthlyBalance = async (transactionData) => {
@@ -237,15 +378,25 @@ const updateMonthlyBalance = async (transactionData) => {
         const month = transactionDate.getMonth(); // 0-11
         const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
         
-        // Update the monthly balance document with the latest Saldo Kas
-        await db.collection('monthlyBalances').doc(monthKey).set({
+        // Calculate all account balances for this month
+        const accountBalances = await calculateMonthlyAccountBalances(year, month + 1);
+        
+        // Prepare the monthly balance document
+        const monthlyBalanceData = {
             year: year,
             month: month + 1,
             endingBalance: transactionData.saldoKas,
+            accountBalances: accountBalances,
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        };
         
-        console.log(`Monthly balance updated for ${monthKey}: ${formatCurrency(transactionData.saldoKas)}`);
+        // Update the monthly balance document
+        await db.collection('monthlyBalances').doc(monthKey).set(monthlyBalanceData, { merge: true });
+        
+        console.log(`Monthly balance updated for ${monthKey}:`, {
+            saldoKas: formatCurrency(transactionData.saldoKas),
+            accounts: Object.keys(accountBalances).length
+        });
         
     } catch (error) {
         console.error('Error updating monthly balance:', error);
@@ -282,16 +433,20 @@ const checkAndSavePreviousMonthBalance = async () => {
                 const lastTransaction = prevMonthTransactions.docs[0].data();
                 const endingBalance = lastTransaction.saldoKas || 0;
                 
-                // Save the ending balance for previous month
+                // Calculate account balances for previous month
+                const accountBalances = await calculateMonthlyAccountBalances(prevYear, prevMonth + 1);
+                
+                // Save the ending balance and account balances for previous month
                 await db.collection('monthlyBalances').doc(prevMonthKey).set({
                     year: prevYear,
                     month: prevMonth + 1,
                     endingBalance: endingBalance,
+                    accountBalances: accountBalances,
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                     autoSaved: true
                 });
                 
-                console.log(`Auto-saved previous month balance for ${prevMonthKey}: ${formatCurrency(endingBalance)}`);
+                console.log(`Auto-saved previous month balance for ${prevMonthKey}: ${formatCurrency(endingBalance)} with ${Object.keys(accountBalances).length} accounts`);
             }
         }
         
