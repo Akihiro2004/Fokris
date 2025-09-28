@@ -666,8 +666,47 @@ const enhancedCategorySelection = () => {
 const updateTransactionName = (category) => {
     const transactionNameField = document.getElementById('transactionName');
     if (transactionNameField && category) {
-        transactionNameField.value = category.fullName;
+        // Build hierarchical transaction name
+        const hierarchicalName = buildHierarchicalName(category.id);
+        transactionNameField.value = hierarchicalName;
     }
+};
+
+// Build hierarchical category name path
+const buildHierarchicalName = (categoryId) => {
+    const category = getCategoryById(categoryId);
+    if (!category) return '';
+    
+    const pathNames = [];
+    let currentCategory = category;
+    
+    // Traverse up the hierarchy to build the path
+    while (currentCategory) {
+        // Use the name field (without index) for cleaner display
+        const namePart = currentCategory.name || extractNameFromFullName(currentCategory.fullName);
+        if (namePart) {
+            pathNames.unshift(namePart); // Add to beginning of array
+        }
+        
+        // Get parent category
+        if (currentCategory.parentId) {
+            currentCategory = getCategoryById(currentCategory.parentId);
+        } else {
+            break;
+        }
+    }
+    
+    // Join with " - " separator
+    return pathNames.join(' - ');
+};
+
+// Extract name part from fullName (fallback if name field is not available)
+const extractNameFromFullName = (fullName) => {
+    if (!fullName) return '';
+    
+    // Remove the index number and dot at the beginning (e.g., "2.1. " -> "")
+    const match = fullName.match(/^[\d.]+\s*(.+)$/);
+    return match ? match[1].trim() : fullName;
 };
 
 // Clear transaction name
