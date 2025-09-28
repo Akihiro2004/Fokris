@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forkris Accounting System - Add Transaction</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100">
+                            <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <h1 class="ml-3 text-xl font-semibold text-gray-900">Tambah Transaksi</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="home.html" class="text-gray-500 hover:text-gray-700 text-sm font-medium">Kembali ke Dashboard</a>
+                    <a href="settings.html" class="text-gray-500 hover:text-gray-700 text-sm font-medium">Settings</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-2xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-6">Form Transaksi Baru</h3>
+                
+                <form id="transactionForm" class="space-y-6">
+                    <!-- Transaction Name (Auto-populated from Category) -->
+                    <div>
+                        <label for="transactionName" class="block text-sm font-medium text-gray-700">Nama Transaksi</label>
+                        <input type="text" id="transactionName" required readonly class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm" placeholder="Pilih kategori untuk mengisi nama otomatis">
+                        <p class="mt-1 text-sm text-gray-500">Nama akan terisi otomatis berdasarkan kategori yang dipilih</p>
+                    </div>
+
+                    <!-- Date -->
+                    <div>
+                        <label for="transactionDate" class="block text-sm font-medium text-gray-700">Tanggal</label>
+                        <input type="date" id="transactionDate" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    </div>
+
+                    <!-- Category Selection -->
+                    <div class="space-y-4">
+                        <label class="block text-sm font-medium text-gray-700">Kategori Transaksi</label>
+                        
+                        <!-- Level 1 -->
+                        <div>
+                            <select id="category1" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">Pilih Kategori Utama</option>
+                            </select>
+                        </div>
+
+                        <!-- Level 2 -->
+                        <div id="category2Container" class="hidden">
+                            <select id="category2" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">Pilih Sub Kategori</option>
+                            </select>
+                        </div>
+
+                        <!-- Level 3 -->
+                        <div id="category3Container" class="hidden">
+                            <select id="category3" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">Pilih Sub Kategori</option>
+                            </select>
+                        </div>
+
+                        <!-- Level 4 -->
+                        <div id="category4Container" class="hidden">
+                            <select id="category4" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">Pilih Sub Kategori</option>
+                            </select>
+                        </div>
+
+                        <!-- Level 5 -->
+                        <div id="category5Container" class="hidden">
+                            <select id="category5" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">Pilih Sub Kategori</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Selected Category Display -->
+                    <div id="selectedCategoryDisplay" class="hidden">
+                        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                            <h4 class="text-sm font-medium text-blue-900">Kategori Terpilih:</h4>
+                            <p id="selectedCategoryText" class="text-sm text-blue-700 mt-1"></p>
+                        </div>
+                    </div>
+
+                    <!-- Amount Input -->
+                    <div>
+                        <label for="amount" class="block text-sm font-medium text-gray-700">Jumlah (IDR)</label>
+                        <div class="mt-1 relative rounded-md shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 sm:text-sm">Rp</span>
+                            </div>
+                            <input type="number" id="amount" required class="block w-full pl-8 pr-12 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="0">
+                        </div>
+                    </div>
+
+                    <!-- Account Selection -->
+                    <div>
+                        <label for="accountId" class="block text-sm font-medium text-gray-700">Pilih Akun</label>
+                        <select id="accountId" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="">Pilih Akun</option>
+                            <!-- Account options will be populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Description -->
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700">Keterangan (Opsional)</label>
+                        <textarea id="description" rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Keterangan tambahan transaksi..."></textarea>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="flex justify-end space-x-3">
+                        <a href="home.html" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Batal
+                        </a>
+                        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Simpan Transaksi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/env-config.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/categories.js"></script>
+    <script src="js/transaction-form.js"></script>
+</body>
+</html>
