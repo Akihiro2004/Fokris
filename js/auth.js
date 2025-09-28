@@ -75,7 +75,6 @@ const checkAuthAndRedirect = () => {
     });
 };
 
-// Handle login form submission
 const handleLogin = async (event) => {
     event.preventDefault();
     
