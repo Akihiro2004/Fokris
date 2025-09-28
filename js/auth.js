@@ -1,11 +1,8 @@
-// Authentication system
 let currentUser = null;
 let userRole = null;
 let authListenerInitialized = false;
 
-// Check if user is authenticated and redirect appropriately
 const checkAuthAndRedirect = () => {
-    // Prevent multiple listeners
     if (authListenerInitialized) {
         return;
     }
@@ -17,7 +14,6 @@ const checkAuthAndRedirect = () => {
         if (user) {
             currentUser = user;
             
-            // Get user role from Firestore
             try {
                 const userDoc = await db.collection('users').doc(user.uid).get();
                 if (userDoc.exists) {
@@ -32,7 +28,6 @@ const checkAuthAndRedirect = () => {
                         userRole = 'guest';
                     }
                     
-                    // Save user data to Firestore
                     await db.collection('users').doc(user.uid).set({
                         email: user.email,
                         role: userRole,
@@ -41,7 +36,6 @@ const checkAuthAndRedirect = () => {
                     });
                 }
                 
-                // Only redirect from login page to home, don't redirect from other pages
                 if ((currentPage === 'index.html' || currentPage === '') && window.location.href.indexOf('home.html') === -1) {
                     setTimeout(() => {
                         window.location.href = 'home.html';
@@ -49,10 +43,8 @@ const checkAuthAndRedirect = () => {
                     return;
                 }
                 
-                // Update user info displays
                 updateUserInfoDisplays();
                 
-                // Initialize page-specific functionality after authentication is confirmed
                 setTimeout(() => {
                     if (typeof initializePage === 'function') {
                         initializePage();
@@ -74,7 +66,6 @@ const checkAuthAndRedirect = () => {
             currentUser = null;
             userRole = null;
             
-            // Only redirect to login if not already on login page
             if (currentPage !== 'index.html' && currentPage !== '') {
                 setTimeout(() => {
                     window.location.href = 'index.html';

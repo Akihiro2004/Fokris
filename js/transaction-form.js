@@ -1,8 +1,6 @@
-// Transaction form functionality
 let selectedCategory = null;
 let allAccounts = [];
 
-// Load accounts from Firestore
 const loadAccounts = async () => {
     try {
         const snapshot = await db.collection('accounts').where('isActive', '==', true).orderBy('createdAt').get();
@@ -20,7 +18,6 @@ const loadAccounts = async () => {
     }
 };
 
-// Populate account dropdown
 const populateAccountDropdown = async () => {
     try {
         await loadAccounts();
@@ -28,10 +25,8 @@ const populateAccountDropdown = async () => {
         const accountSelect = document.getElementById('accountId');
         if (!accountSelect) return;
         
-        // Clear existing options except the first one
         accountSelect.innerHTML = '<option value="">Pilih Akun</option>';
         
-        // Add account options
         allAccounts.forEach(account => {
             const option = document.createElement('option');
             option.value = account.id;
@@ -51,23 +46,17 @@ const calculateSaldoKas = async (transactionData) => {
             throw new Error('Kategori tidak ditemukan');
         }
         
-        // Get the category index to determine transaction type
         const categoryIndex = category.index;
         let transactionAmount = transactionData.amount;
         
-        // Determine if this is income (2.x) or expense (3.x)
         if (categoryIndex.startsWith('2')) {
-            // Income - positive amount (regardless of account)
             transactionAmount = Math.abs(transactionAmount);
         } else if (categoryIndex.startsWith('3')) {
-            // Expense - negative amount (regardless of account)
             transactionAmount = -Math.abs(transactionAmount);
         } else if (categoryIndex.startsWith('1')) {
-            // Saldo Awal - use amount as is (should not be selectable by users)
             transactionAmount = transactionData.amount;
         }
         
-        // Get the most recent Saldo Kas from existing transactions
         const previousBalance = await getPreviousSaldoKas(transactionData.date);
         
         console.log('=== SALDO KAS CALCULATION DEBUG ===');
@@ -80,7 +69,6 @@ const calculateSaldoKas = async (transactionData) => {
         console.log('Calculation:', previousBalance, '+', transactionAmount, '=', (previousBalance + transactionAmount));
         console.log('=====================================');
         
-        // Calculate new Saldo Kas: Previous Saldo Kas + Current Transaction Amount
         const newSaldoKas = previousBalance + transactionAmount;
         
         return newSaldoKas;
@@ -93,19 +81,16 @@ const calculateSaldoKas = async (transactionData) => {
 
 const getPreviousSaldoKas = async (currentTransactionDate) => {
     try {
-        // Get ALL transactions, then find the most recent one by date and time
         const allTransactionsQuery = await db.collection('transactions')
             .orderBy('date', 'desc')
             .orderBy('createdAt', 'desc')
             .get();
         
         if (!allTransactionsQuery.empty) {
-            // Get the most recent transaction overall
             const mostRecentTransaction = allTransactionsQuery.docs[0].data();
             console.log('Most recent transaction Saldo Kas:', mostRecentTransaction.saldoKas || 0);
             return mostRecentTransaction.saldoKas || 0;
         } else {
-            // No previous transactions at all, check for monthly starting balance
             const currentDate = new Date(currentTransactionDate);
             return await getMonthlyStartingBalance(currentDate);
         }
@@ -132,7 +117,6 @@ const getMonthlyStartingBalance = async (currentDate) => {
             const endingBalance = data.endingBalance || 0;
             console.log(`Found previous month balance for ${monthKey}: ${endingBalance}`);
             
-            // Also log account balances if available
             if (data.accountBalances) {
                 console.log(`Account balances for ${monthKey}:`, data.accountBalances);
             }
@@ -408,16 +392,13 @@ const checkAndSavePreviousMonthBalance = async () => {
         const now = new Date();
         const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         
-        // Get previous month
         const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
         const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
         const prevMonthKey = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`;
         
-        // Check if previous month balance already exists
         const prevMonthDoc = await db.collection('monthlyBalances').doc(prevMonthKey).get();
         
         if (!prevMonthDoc.exists) {
-            // Get the most recent transaction from previous month
             const startOfPrevMonth = new Date(prevYear, prevMonth, 1);
             const endOfPrevMonth = new Date(prevYear, prevMonth + 1, 0, 23, 59, 59);
             
@@ -432,11 +413,8 @@ const checkAndSavePreviousMonthBalance = async () => {
             if (!prevMonthTransactions.empty) {
                 const lastTransaction = prevMonthTransactions.docs[0].data();
                 const endingBalance = lastTransaction.saldoKas || 0;
-                
-                // Calculate account balances for previous month
                 const accountBalances = await calculateMonthlyAccountBalances(prevYear, prevMonth + 1);
                 
-                // Save the ending balance and account balances for previous month
                 await db.collection('monthlyBalances').doc(prevMonthKey).set({
                     year: prevYear,
                     month: prevMonth + 1,
@@ -455,7 +433,6 @@ const checkAndSavePreviousMonthBalance = async () => {
     }
 };
 
-// Handle transaction form submission
 const handleTransactionSubmit = async (event) => {
     event.preventDefault();
     
@@ -467,7 +444,6 @@ const handleTransactionSubmit = async (event) => {
     const form = event.target;
     const submitButton = form.querySelector('button[type="submit"]');
     
-    // Get form data
     const transactionData = {
         name: document.getElementById('transactionName').value.trim(),
         date: document.getElementById('transactionDate').value,
@@ -482,7 +458,6 @@ const handleTransactionSubmit = async (event) => {
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
-    // Validation
     if (!transactionData.name) {
         alert('Nama transaksi harus diisi');
         return;
@@ -513,44 +488,33 @@ const handleTransactionSubmit = async (event) => {
     submitButton.textContent = 'Menyimpan...';
     
     try {
-        // Calculate Saldo Kas based on transaction type
         const calculatedSaldoKas = await calculateSaldoKas(transactionData);
         transactionData.saldoKas = calculatedSaldoKas;
-        // Convert date string to Firestore timestamp
         transactionData.date = firebase.firestore.Timestamp.fromDate(new Date(transactionData.date));
         
-        // Add transaction to Firestore
         const docRef = await db.collection('transactions').add(transactionData);
         
         console.log('Transaction added with ID:', docRef.id);
         
-        // Show success message
         alert('Transaksi berhasil disimpan!');
         
-        // Update monthly balance after transaction is saved
         await updateMonthlyBalance(transactionData);
-        
-        // Check and save previous month's balance if needed
         await checkAndSavePreviousMonthBalance();
         
-        // Reset form
         form.reset();
         resetCategorySelectors();
         
-        // Set today's date as default
         document.getElementById('transactionDate').valueAsDate = new Date();
         
     } catch (error) {
         console.error('Error adding transaction:', error);
         alert('Terjadi kesalahan saat menyimpan transaksi: ' + error.message);
     } finally {
-        // Re-enable submit button
         submitButton.disabled = false;
         submitButton.textContent = 'Simpan Transaksi';
     }
 };
 
-// Get selected category ID from the form
 const getSelectedCategoryId = () => {
     const selectors = ['category5', 'category4', 'category3', 'category2', 'category1'];
     
@@ -583,26 +547,21 @@ const resetCategorySelectors = () => {
         }
     });
     
-    // Hide category display
     const display = document.getElementById('selectedCategoryDisplay');
     if (display) {
         display.classList.add('hidden');
     }
     
-    // Reset selected category
     selectedCategory = null;
     
-    // Clear transaction name
     clearTransactionName();
     
-    // Repopulate first level
     const category1Select = document.getElementById('category1');
     if (category1Select) {
         populateCategorySelect(category1Select, null, 1, 'Pilih Kategori Utama');
     }
 };
 
-// Enhanced category selection handling
 const enhancedCategorySelection = () => {
     const selectors = ['category1', 'category2', 'category3', 'category4', 'category5'];
     
@@ -614,7 +573,6 @@ const enhancedCategorySelection = () => {
                 const selectedValue = e.target.value;
                 const nextIndex = index + 1;
                 
-                // Hide all subsequent selectors
                 for (let i = nextIndex; i < selectors.length; i++) {
                     const container = document.getElementById(`${selectors[i]}Container`);
                     const selector = document.getElementById(selectors[i]);
@@ -622,16 +580,13 @@ const enhancedCategorySelection = () => {
                     if (selector) selector.innerHTML = '<option value="">Pilih Sub Kategori</option>';
                 }
                 
-                // Hide category display initially
                 const display = document.getElementById('selectedCategoryDisplay');
                 if (display) display.classList.add('hidden');
                 
                 if (selectedValue) {
-                    // Get children of selected category
                     const children = getCategoriesByParent(selectedValue, index + 2);
                     
                     if (children.length > 0) {
-                        // Show next selector if there are children
                         const nextContainer = document.getElementById(`${selectors[nextIndex]}Container`);
                         const nextSelect = document.getElementById(selectors[nextIndex]);
                         
@@ -640,7 +595,6 @@ const enhancedCategorySelection = () => {
                             populateCategorySelect(nextSelect, selectedValue, index + 2, 'Pilih Sub Kategori', ['1']);
                         }
                     } else {
-                        // No children, this is the final selection
                         updateSelectedCategoryDisplay(selectedValue);
                         selectedCategory = getCategoryById(selectedValue);
                         updateTransactionName(selectedCategory);
@@ -650,7 +604,6 @@ const enhancedCategorySelection = () => {
                     clearTransactionName();
                 }
                 
-                // Also update transaction name if there are children (partial selection)
                 if (selectedValue) {
                     const partialCategory = getCategoryById(selectedValue);
                     if (partialCategory) {
@@ -662,17 +615,14 @@ const enhancedCategorySelection = () => {
     });
 };
 
-// Update transaction name based on selected category
 const updateTransactionName = (category) => {
     const transactionNameField = document.getElementById('transactionName');
     if (transactionNameField && category) {
-        // Build hierarchical transaction name
         const hierarchicalName = buildHierarchicalName(category.id);
         transactionNameField.value = hierarchicalName;
     }
 };
 
-// Build hierarchical category name path
 const buildHierarchicalName = (categoryId) => {
     const category = getCategoryById(categoryId);
     if (!category) return '';
@@ -680,15 +630,12 @@ const buildHierarchicalName = (categoryId) => {
     const pathNames = [];
     let currentCategory = category;
     
-    // Traverse up the hierarchy to build the path
     while (currentCategory) {
-        // Use the name field (without index) for cleaner display
         const namePart = currentCategory.name || extractNameFromFullName(currentCategory.fullName);
         if (namePart) {
-            pathNames.unshift(namePart); // Add to beginning of array
+            pathNames.unshift(namePart);
         }
         
-        // Get parent category
         if (currentCategory.parentId) {
             currentCategory = getCategoryById(currentCategory.parentId);
         } else {
@@ -696,20 +643,16 @@ const buildHierarchicalName = (categoryId) => {
         }
     }
     
-    // Join with " - " separator
     return pathNames.join(' - ');
 };
 
-// Extract name part from fullName (fallback if name field is not available)
 const extractNameFromFullName = (fullName) => {
     if (!fullName) return '';
     
-    // Remove the index number and dot at the beginning (e.g., "2.1. " -> "")
     const match = fullName.match(/^[\d.]+\s*(.+)$/);
     return match ? match[1].trim() : fullName;
 };
 
-// Clear transaction name
 const clearTransactionName = () => {
     const transactionNameField = document.getElementById('transactionName');
     if (transactionNameField) {
