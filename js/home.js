@@ -47,7 +47,7 @@ const loadTransactions = async () => {
         
         
         // Apply current filters
-        applyFilters();
+        await applyFilters();
         
         return allTransactions;
     } catch (error) {
@@ -57,7 +57,7 @@ const loadTransactions = async () => {
 };
 
 // Apply filters to transactions
-const applyFilters = () => {
+const applyFilters = async () => {
     filteredTransactions = allTransactions.filter(transaction => {
         // Month filter
         if (currentFilters.month) {
@@ -88,7 +88,7 @@ const applyFilters = () => {
     });
     
     // Update displays
-    displayTransactions();
+    await displayTransactions();
 };
 
 // Get month-year string from date
@@ -120,69 +120,70 @@ const groupTransactionsByMonth = (transactions) => {
     return groups;
 };
 
-const getMonthlyBalances = (monthYear, monthTransactions) => {
+const getMonthlyBalances = async (monthYear, monthTransactions) => {
+    try {
+        // Get balance data from monthlyBalances collection
+        const monthlyBalanceDoc = await db.collection('monthlyBalances').doc(monthYear).get();
+        
+        if (monthlyBalanceDoc.exists) {
+            const balanceData = monthlyBalanceDoc.data();
+            return {
+                saldoAwal: balanceData.startingBalance || 0,
+                saldoAkhir: balanceData.endingBalance || 0
+            };
+        }
+        
+        // Fallback: if no balance document exists, try to calculate from transactions
+        console.warn(`No balance document found for ${monthYear}, using fallback calculation`);
+        return await calculateFallbackBalances(monthYear, monthTransactions);
+        
+    } catch (error) {
+        console.error('Error getting monthly balances:', error);
+        return await calculateFallbackBalances(monthYear, monthTransactions);
+    }
+};
+
+// Fallback calculation for months without balance documents
+const calculateFallbackBalances = async (monthYear, monthTransactions) => {
+    let saldoAwal = 0;
     let saldoAkhir = 0;
-    if (allTransactions.length > 0) {
-        const sortedAllTransactions = [...allTransactions].sort((a, b) => {
+    
+    if (monthTransactions.length > 0) {
+        // Sort transactions by date to get first and last
+        const sortedTransactions = [...monthTransactions].sort((a, b) => {
             const dateA = a.date.toDate ? a.date.toDate() : new Date(a.date);
             const dateB = b.date.toDate ? b.date.toDate() : new Date(b.date);
             
             if (dateA.getTime() !== dateB.getTime()) {
-                return dateB.getTime() - dateA.getTime();
+                return dateA.getTime() - dateB.getTime();
             }
             
             const createdA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
             const createdB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-            return createdB.getTime() - createdA.getTime();
+            return createdA.getTime() - createdB.getTime();
         });
         
-        saldoAkhir = sortedAllTransactions[0].saldoKas || 0;
-    }
-    
-    let saldoAwal = 0;
-    if (monthTransactions.length > 0) {
-        const [year, month] = monthYear.split('-');
-        const monthStart = new Date(year, month - 1, 1);
-        const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
+        const firstTransaction = sortedTransactions[0];
+        const lastTransaction = sortedTransactions[sortedTransactions.length - 1];
         
-        const allMonthTransactions = allTransactions.filter(transaction => {
-            const transDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
-            return transDate >= monthStart && transDate <= monthEnd;
-        });
+        // Calculate Saldo Awal from first transaction
+        const category = getCategoryById(firstTransaction.categoryId);
+        let firstTransactionAmount = firstTransaction.amount;
         
-        if (allMonthTransactions.length > 0) {
-            const sortedMonthTransactions = [...allMonthTransactions].sort((a, b) => {
-                const dateA = a.date.toDate ? a.date.toDate() : new Date(a.date);
-                const dateB = b.date.toDate ? b.date.toDate() : new Date(b.date);
-                
-                if (dateA.getTime() !== dateB.getTime()) {
-                    return dateA.getTime() - dateB.getTime(); // Oldest first
-                }
-                
-                const createdA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
-                const createdB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-                return createdA.getTime() - createdB.getTime();
-            });
-            
-            const firstTransaction = sortedMonthTransactions[0];
-            
-            const category = getCategoryById(firstTransaction.categoryId);
-            let firstTransactionAmount = firstTransaction.amount;
-            
-            if (category && category.index.startsWith('2')) {
-                firstTransactionAmount = Math.abs(firstTransactionAmount);
-            } else if (category && category.index.startsWith('3')) {
-                firstTransactionAmount = -Math.abs(firstTransactionAmount);
-            }
-            
-            saldoAwal = (firstTransaction.saldoKas || 0) - firstTransactionAmount;
+        if (category && category.index.startsWith('2')) {
+            firstTransactionAmount = Math.abs(firstTransactionAmount);
+        } else if (category && category.index.startsWith('3')) {
+            firstTransactionAmount = -Math.abs(firstTransactionAmount);
         }
+        
+        saldoAwal = (firstTransaction.saldoKas || 0) - firstTransactionAmount;
+        saldoAkhir = lastTransaction.saldoKas || 0;
     }
     
     return { saldoAwal, saldoAkhir };
 };
 
-const displaySaldoAwalOnly = () => {
+const displaySaldoAwalOnly = async () => {
     const transactionList = document.getElementById('transactionList');
     if (!transactionList) return;
     
@@ -211,9 +212,10 @@ const displaySaldoAwalOnly = () => {
         ? sortedMonths.filter(month => month === currentFilters.month)
         : sortedMonths;
     
-    filteredMonths.forEach((monthYear, monthIndex) => {
+    for (let monthIndex = 0; monthIndex < filteredMonths.length; monthIndex++) {
+        const monthYear = filteredMonths[monthIndex];
         const monthTransactions = monthlyGroups[monthYear];
-        const { saldoAwal } = getMonthlyBalances(monthYear, monthTransactions);
+        const { saldoAwal } = await getMonthlyBalances(monthYear, monthTransactions);
         
         const [year, month] = monthYear.split('-');
         const date = new Date(year, month - 1, 1);
@@ -249,19 +251,19 @@ const displaySaldoAwalOnly = () => {
                 </div>
             </li>
         `;
-    });
+    }
     
     transactionList.innerHTML = transactionHTML;
 };
 
 // Display transactions in the list with monthly grouping
-const displayTransactions = () => {
+const displayTransactions = async () => {
     const transactionList = document.getElementById('transactionList');
     if (!transactionList) return;
     
     // Special handling for "Saldo Awal" filter
     if (currentFilters.category === 'saldo-awal') {
-        displaySaldoAwalOnly();
+        await displaySaldoAwalOnly();
         return;
     }
     
@@ -286,9 +288,10 @@ const displayTransactions = () => {
     
     let transactionHTML = '';
     
-    sortedMonths.forEach((monthYear, monthIndex) => {
+    for (let monthIndex = 0; monthIndex < sortedMonths.length; monthIndex++) {
+        const monthYear = sortedMonths[monthIndex];
         const monthTransactions = monthlyGroups[monthYear];
-        const { saldoAwal, saldoAkhir } = getMonthlyBalances(monthYear, monthTransactions);
+        const { saldoAwal, saldoAkhir } = await getMonthlyBalances(monthYear, monthTransactions);
         
         // Convert monthYear to readable format
         const [year, month] = monthYear.split('-');
@@ -459,7 +462,7 @@ const displayTransactions = () => {
                 </div>
             </li>
         `;
-    });
+    }
     
     transactionList.innerHTML = transactionHTML;
 };
@@ -492,10 +495,10 @@ const setupMonthFilter = () => {
         monthFilter.appendChild(option);
     });
     
-    monthFilter.addEventListener('change', (e) => {
+    monthFilter.addEventListener('change', async (e) => {
         currentFilters.month = e.target.value;
         console.log('Month filter changed to:', currentFilters.month);
-        applyFilters();
+        await applyFilters();
     });
 };
 
@@ -527,21 +530,21 @@ const setupCategoryFilter = () => {
         categoryFilter.appendChild(option);
     });
     
-    categoryFilter.addEventListener('change', (e) => {
+    categoryFilter.addEventListener('change', async (e) => {
         currentFilters.category = e.target.value;
         console.log('Category filter changed to:', currentFilters.category);
-        applyFilters();
+        await applyFilters();
     });
 };
 
-window.applyFilters = () => {
+window.applyFilters = async () => {
     const monthFilter = document.getElementById('monthFilter');
     const categoryFilter = document.getElementById('categoryFilter');
     
     currentFilters.month = monthFilter ? monthFilter.value : '';
     currentFilters.category = categoryFilter ? categoryFilter.value : '';
     
-    applyFilters();
+    await applyFilters();
 };
 
 const initializePage = async () => {

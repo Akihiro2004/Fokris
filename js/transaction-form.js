@@ -291,6 +291,172 @@ const promptForInitialBalance = async (previousMonthKey, currentDate) => {
     });
 };
 
+// Fix and rebuild entire balance chain
+const fixBalanceChain = async () => {
+    try {
+        console.log('Starting balance chain repair...');
+        
+        // Get all transactions ordered chronologically
+        const allTransactionsSnapshot = await db.collection('transactions')
+            .orderBy('date', 'asc')
+            .orderBy('createdAt', 'asc')
+            .get();
+        
+        if (allTransactionsSnapshot.empty) {
+            console.log('No transactions found');
+            return;
+        }
+        
+        // Group transactions by month and find the last transaction of each month
+        const monthlyTransactions = new Map();
+        
+        allTransactionsSnapshot.forEach(doc => {
+            const transaction = { id: doc.id, ...doc.data() };
+            const transactionDate = transaction.date.toDate();
+            const year = transactionDate.getFullYear();
+            const month = transactionDate.getMonth() + 1; // 1-12
+            const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+            
+            if (!monthlyTransactions.has(monthKey)) {
+                monthlyTransactions.set(monthKey, {
+                    year,
+                    month,
+                    transactions: []
+                });
+            }
+            
+            monthlyTransactions.get(monthKey).transactions.push(transaction);
+        });
+        
+        // Sort months chronologically
+        const sortedMonthKeys = Array.from(monthlyTransactions.keys()).sort();
+        
+        console.log(`Found ${sortedMonthKeys.length} months to process`);
+        
+        let previousEndingBalance = 0;
+        
+        // Process each month in order
+        for (const monthKey of sortedMonthKeys) {
+            const monthData = monthlyTransactions.get(monthKey);
+            const { year, month, transactions } = monthData;
+            
+            // Starting balance = previous month's ending balance
+            const startingBalance = previousEndingBalance;
+            
+            // Find the last transaction of this month
+            const lastTransaction = transactions[transactions.length - 1];
+            const endingBalance = lastTransaction.saldoKas || 0;
+            
+            // Calculate account balances for this month
+            const accountBalances = await calculateMonthlyAccountBalances(year, month);
+            
+            // Create/update the monthly balance document
+            const monthlyBalanceData = {
+                year: year,
+                month: month,
+                startingBalance: startingBalance,
+                endingBalance: endingBalance,
+                accountBalances: accountBalances,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                repaired: true
+            };
+            
+            await db.collection('monthlyBalances').doc(monthKey).set(monthlyBalanceData);
+            
+            console.log(`Fixed ${monthKey}: start=${formatCurrency(startingBalance)}, end=${formatCurrency(endingBalance)}`);
+            
+            // Update for next month
+            previousEndingBalance = endingBalance;
+        }
+        
+        console.log('Balance chain repair completed successfully!');
+        alert('Balance chain has been repaired! All monthly balances are now properly linked.');
+        
+    } catch (error) {
+        console.error('Error fixing balance chain:', error);
+        alert('Error fixing balance chain: ' + error.message);
+    }
+};
+
+// Expose balance fix function globally for manual use
+window.fixBalanceChain = fixBalanceChain;
+
+// Initialize balance chain on page load if needed
+const initializeBalanceChain = async () => {
+    try {
+        console.log('Checking balance chain integrity...');
+        
+        // Get all monthly balance documents
+        const monthlyBalancesSnapshot = await db.collection('monthlyBalances').get();
+        const balanceDocs = [];
+        
+        monthlyBalancesSnapshot.forEach(doc => {
+            const data = doc.data();
+            balanceDocs.push({
+                id: doc.id,
+                year: data.year,
+                month: data.month,
+                data: data
+            });
+        });
+        
+        // Sort chronologically
+        balanceDocs.sort((a, b) => {
+            if (a.year !== b.year) return a.year - b.year;
+            return a.month - b.month;
+        });
+        
+        let needsRepair = false;
+        
+        // Check if balance chain is properly linked
+        for (let i = 1; i < balanceDocs.length; i++) {
+            const prevDoc = balanceDocs[i - 1];
+            const currentDoc = balanceDocs[i];
+            
+            // Check if current month's startingBalance equals previous month's endingBalance
+            if (!currentDoc.data.startingBalance || 
+                Math.abs(currentDoc.data.startingBalance - (prevDoc.data.endingBalance || 0)) > 0.01) {
+                
+                console.log(`Balance chain broken between ${prevDoc.id} and ${currentDoc.id}`);
+                console.log(`Previous ending: ${formatCurrency(prevDoc.data.endingBalance || 0)}, Current starting: ${formatCurrency(currentDoc.data.startingBalance || 0)}`);
+                needsRepair = true;
+                break;
+            }
+        }
+        
+        // Also check if any document is missing startingBalance field
+        const missingStartingBalance = balanceDocs.some(doc => 
+            doc.data.startingBalance === undefined || doc.data.startingBalance === null
+        );
+        
+        if (needsRepair || missingStartingBalance) {
+            console.log('Balance chain needs repair, fixing automatically...');
+            await fixBalanceChain();
+        } else {
+            console.log('Balance chain is consistent ✓');
+        }
+        
+    } catch (error) {
+        console.error('Error initializing balance chain:', error);
+    }
+};
+
+// Run balance chain initialization when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    // Add a small delay to ensure other initializations complete first
+    setTimeout(initializeBalanceChain, 1000);
+});
+
+// Also expose for manual use
+window.initializeBalanceChain = initializeBalanceChain;
+
+// Console command helper for debugging
+console.log('%c🔗 Balance Chain System Loaded!', 'color: #10B981; font-weight: bold; font-size: 14px;');
+console.log('%c📋 Available commands:', 'color: #6366F1; font-weight: bold;');
+console.log('%c  fixBalanceChain() - Manually repair balance chain', 'color: #8B5CF6;');
+console.log('%c  initializeBalanceChain() - Check and repair if needed', 'color: #8B5CF6;');
+console.log('%c💡 Balance chain ensures Saldo Awal = Previous Month\'s Saldo Akhir', 'color: #F59E0B;');
+
 // Calculate account balances for a specific month
 const calculateMonthlyAccountBalances = async (year, month) => {
     try {
@@ -359,16 +525,22 @@ const updateMonthlyBalance = async (transactionData) => {
     try {
         const transactionDate = transactionData.date.toDate ? transactionData.date.toDate() : new Date(transactionData.date);
         const year = transactionDate.getFullYear();
-        const month = transactionDate.getMonth(); // 0-11
-        const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+        const month = transactionDate.getMonth() + 1; // 1-12 for consistency
+        const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+        
+        console.log(`Updating monthly balance for ${monthKey} with transaction saldoKas: ${formatCurrency(transactionData.saldoKas)}`);
         
         // Calculate all account balances for this month
-        const accountBalances = await calculateMonthlyAccountBalances(year, month + 1);
+        const accountBalances = await calculateMonthlyAccountBalances(year, month);
+        
+        // Get the starting balance for this month (from previous month's ending balance)
+        const startingBalance = await getMonthStartingBalance(year, month);
         
         // Prepare the monthly balance document
         const monthlyBalanceData = {
             year: year,
-            month: month + 1,
+            month: month,
+            startingBalance: startingBalance,
             endingBalance: transactionData.saldoKas,
             accountBalances: accountBalances,
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
@@ -378,12 +550,142 @@ const updateMonthlyBalance = async (transactionData) => {
         await db.collection('monthlyBalances').doc(monthKey).set(monthlyBalanceData, { merge: true });
         
         console.log(`Monthly balance updated for ${monthKey}:`, {
-            saldoKas: formatCurrency(transactionData.saldoKas),
+            startingBalance: formatCurrency(startingBalance),
+            endingBalance: formatCurrency(transactionData.saldoKas),
             accounts: Object.keys(accountBalances).length
         });
         
+        // Update subsequent months' starting balances to maintain the chain
+        await updateSubsequentMonthsChain(year, month, transactionData.saldoKas);
+        
     } catch (error) {
         console.error('Error updating monthly balance:', error);
+    }
+};
+
+// Get starting balance for a month (previous month's ending balance)
+const getMonthStartingBalance = async (year, month) => {
+    try {
+        // Calculate previous month
+        const prevMonth = month === 1 ? 12 : month - 1;
+        const prevYear = month === 1 ? year - 1 : year;
+        const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+        
+        // Get previous month's balance document
+        const prevMonthDoc = await db.collection('monthlyBalances').doc(prevMonthKey).get();
+        
+        if (prevMonthDoc.exists) {
+            const prevData = prevMonthDoc.data();
+            return prevData.endingBalance || 0;
+        }
+        
+        // If no previous month document, return 0
+        return 0;
+        
+    } catch (error) {
+        console.error('Error getting month starting balance:', error);
+        return 0;
+    }
+};
+
+// Update subsequent months' starting balances and recalculate their ending balances
+const updateSubsequentMonthsChain = async (fromYear, fromMonth, newEndingBalance) => {
+    try {
+        console.log(`Updating balance chain from ${fromYear}-${fromMonth} with new ending balance: ${formatCurrency(newEndingBalance)}`);
+        
+        // Get all monthly balance documents
+        const monthlyBalancesSnapshot = await db.collection('monthlyBalances').get();
+        
+        const allMonths = [];
+        monthlyBalancesSnapshot.forEach(doc => {
+            const data = doc.data();
+            allMonths.push({
+                id: doc.id,
+                year: data.year,
+                month: data.month,
+                data: data
+            });
+        });
+        
+        // Find months that come after the fromYear-fromMonth
+        const subsequentMonths = allMonths.filter(monthDoc => {
+            const { year, month } = monthDoc;
+            return year > fromYear || (year === fromYear && month > fromMonth);
+        });
+        
+        // Sort chronologically
+        subsequentMonths.sort((a, b) => {
+            if (a.year !== b.year) return a.year - b.year;
+            return a.month - b.month;
+        });
+        
+        console.log(`Found ${subsequentMonths.length} subsequent months to update`);
+        
+        let currentEndingBalance = newEndingBalance;
+        
+        // Update each subsequent month
+        for (const monthDoc of subsequentMonths) {
+            const { year, month, id } = monthDoc;
+            
+            // This month's starting balance = previous month's ending balance
+            const startingBalance = currentEndingBalance;
+            
+            // Recalculate this month's ending balance by finding the last transaction
+            const monthEndingBalance = await getMonthActualEndingBalance(year, month);
+            
+            // Recalculate account balances for this month
+            const accountBalances = await calculateMonthlyAccountBalances(year, month);
+            
+            // Update this month's document
+            const monthlyBalanceData = {
+                year: year,
+                month: month,
+                startingBalance: startingBalance,
+                endingBalance: monthEndingBalance,
+                accountBalances: accountBalances,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            await db.collection('monthlyBalances').doc(id).set(monthlyBalanceData, { merge: true });
+            
+            console.log(`Updated ${year}-${String(month).padStart(2, '0')}: start=${formatCurrency(startingBalance)}, end=${formatCurrency(monthEndingBalance)}`);
+            
+            // Update for next iteration
+            currentEndingBalance = monthEndingBalance;
+        }
+        
+        console.log('Balance chain update completed');
+        
+    } catch (error) {
+        console.error('Error updating balance chain:', error);
+    }
+};
+
+// Get the actual ending balance for a month (last transaction's saldoKas)
+const getMonthActualEndingBalance = async (year, month) => {
+    try {
+        const startOfMonth = new Date(year, month - 1, 1);
+        const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+        
+        const lastTransactionSnapshot = await db.collection('transactions')
+            .where('date', '>=', firebase.firestore.Timestamp.fromDate(startOfMonth))
+            .where('date', '<=', firebase.firestore.Timestamp.fromDate(endOfMonth))
+            .orderBy('date', 'desc')
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+        
+        if (!lastTransactionSnapshot.empty) {
+            const lastTransaction = lastTransactionSnapshot.docs[0].data();
+            return lastTransaction.saldoKas || 0;
+        }
+        
+        // If no transactions in this month, ending balance = starting balance
+        return await getMonthStartingBalance(year, month);
+        
+    } catch (error) {
+        console.error('Error getting month actual ending balance:', error);
+        return 0;
     }
 };
 
