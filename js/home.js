@@ -167,14 +167,8 @@ const calculateFallbackBalances = async (monthYear, monthTransactions) => {
         const lastTransaction = sortedTransactions[sortedTransactions.length - 1];
         
         // Calculate Saldo Awal from first transaction
-        const category = getCategoryById(firstTransaction.categoryId);
-        let firstTransactionAmount = firstTransaction.amount;
-        
-        if (category && category.index.startsWith('2')) {
-            firstTransactionAmount = Math.abs(firstTransactionAmount);
-        } else if (category && category.index.startsWith('3')) {
-            firstTransactionAmount = -Math.abs(firstTransactionAmount);
-        }
+        // Amount is already stored with correct sign (positive or negative)
+        const firstTransactionAmount = firstTransaction.amount || 0;
         
         saldoAwal = (firstTransaction.saldoKas || 0) - firstTransactionAmount;
         saldoAkhir = lastTransaction.saldoKas || 0;
@@ -376,20 +370,22 @@ const displayTransactions = async () => {
         sortedMonthTransactions.forEach(transaction => {
             const category = getCategoryById(transaction.categoryId);
             const categoryName = category ? category.fullName : transaction.categoryId;
-            const isExpense = transaction.categoryId.startsWith('3');
-            const isIncome = transaction.categoryId.startsWith('2');
+            
+            // Determine if transaction is positive or negative based on actual amount value
+            const isNegative = transaction.amount < 0;
+            const isPositive = transaction.amount > 0;
             
             // Get account name
             const accountName = getAccountNameById(transaction.accountId);
             
-            // Format transaction amount
+            // Format transaction amount with sign
             const formattedAmount = formatCurrency(Math.abs(transaction.amount));
             let amountDisplay = formattedAmount;
             
-            // Add sign based on transaction type for display
-            if (isExpense) {
+            // Add sign based on actual amount value
+            if (isNegative) {
                 amountDisplay = `-${formattedAmount}`;
-            } else if (isIncome) {
+            } else if (isPositive) {
                 amountDisplay = `+${formattedAmount}`;
             }
             
@@ -423,7 +419,7 @@ const displayTransactions = async () => {
                         
                         <!-- Jumlah - 2 columns -->
                         <div class="col-span-2 text-right">
-                            <div class="font-semibold text-sm ${isExpense ? 'text-red-600' : isIncome ? 'text-green-600' : 'text-gray-900'}">${amountDisplay}</div>
+                            <div class="font-semibold text-sm ${isNegative ? 'text-red-600' : isPositive ? 'text-green-600' : 'text-gray-900'}">${amountDisplay}</div>
                             <div class="text-xs text-gray-500 mt-0.5">Jumlah</div>
                         </div>
                         

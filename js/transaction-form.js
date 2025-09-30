@@ -47,23 +47,14 @@ const calculateSaldoKas = async (transactionData) => {
         }
         
         const categoryIndex = category.index;
-        let transactionAmount = transactionData.amount;
-        
-        if (categoryIndex.startsWith('2')) {
-            transactionAmount = Math.abs(transactionAmount);
-        } else if (categoryIndex.startsWith('3')) {
-            transactionAmount = -Math.abs(transactionAmount);
-        } else if (categoryIndex.startsWith('1')) {
-            transactionAmount = transactionData.amount;
-        }
+        // Amount is already stored with correct sign (positive or negative)
+        const transactionAmount = transactionData.amount;
         
         const previousBalance = await getPreviousSaldoKas(transactionData.date);
         
         console.log('=== SALDO KAS CALCULATION DEBUG ===');
         console.log('Transaction Category:', categoryIndex, '(' + category.fullName + ')');
-        console.log('Raw Amount Entered:', transactionData.amount);
-        console.log('Transaction Type:', categoryIndex.startsWith('2') ? 'INCOME (+)' : categoryIndex.startsWith('3') ? 'EXPENSE (-)' : 'OTHER');
-        console.log('Processed Amount with Sign:', transactionAmount);
+        console.log('Transaction Amount (with sign):', transactionAmount);
         console.log('Previous Saldo Kas (from most recent transaction):', previousBalance);
         console.log('Calculation: Previous Saldo Kas + Transaction Amount');
         console.log('Calculation:', previousBalance, '+', transactionAmount, '=', (previousBalance + transactionAmount));
@@ -81,18 +72,24 @@ const calculateSaldoKas = async (transactionData) => {
 
 const getPreviousSaldoKas = async (currentTransactionDate) => {
     try {
-        const allTransactionsQuery = await db.collection('transactions')
+        const transactionDate = new Date(currentTransactionDate);
+        const transactionTimestamp = firebase.firestore.Timestamp.fromDate(transactionDate);
+        
+        // Get the most recent transaction BEFORE this date
+        const previousTransactionsQuery = await db.collection('transactions')
+            .where('date', '<', transactionTimestamp)
             .orderBy('date', 'desc')
             .orderBy('createdAt', 'desc')
+            .limit(1)
             .get();
         
-        if (!allTransactionsQuery.empty) {
-            const mostRecentTransaction = allTransactionsQuery.docs[0].data();
-            console.log('Most recent transaction Saldo Kas:', mostRecentTransaction.saldoKas || 0);
-            return mostRecentTransaction.saldoKas || 0;
+        if (!previousTransactionsQuery.empty) {
+            const previousTransaction = previousTransactionsQuery.docs[0].data();
+            console.log('Previous transaction Saldo Kas:', previousTransaction.saldoKas || 0);
+            return previousTransaction.saldoKas || 0;
         } else {
-            const currentDate = new Date(currentTransactionDate);
-            return await getMonthlyStartingBalance(currentDate);
+            // No previous transactions, get the starting balance for this month
+            return await getMonthlyStartingBalance(transactionDate);
         }
         
     } catch (error) {
@@ -370,16 +367,12 @@ const fixBalanceChain = async () => {
         }
         
         console.log('Balance chain repair completed successfully!');
-        alert('Balance chain has been repaired! All monthly balances are now properly linked.');
         
     } catch (error) {
         console.error('Error fixing balance chain:', error);
         alert('Error fixing balance chain: ' + error.message);
     }
 };
-
-// Expose balance fix function globally for manual use
-window.fixBalanceChain = fixBalanceChain;
 
 // Initialize balance chain on page load if needed
 const initializeBalanceChain = async () => {
@@ -447,14 +440,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(initializeBalanceChain, 1000);
 });
 
-// Also expose for manual use
-window.initializeBalanceChain = initializeBalanceChain;
+// (Already exposed above after function definitions)
 
 // Console command helper for debugging
 console.log('%c🔗 Balance Chain System Loaded!', 'color: #10B981; font-weight: bold; font-size: 14px;');
 console.log('%c📋 Available commands:', 'color: #6366F1; font-weight: bold;');
 console.log('%c  fixBalanceChain() - Manually repair balance chain', 'color: #8B5CF6;');
 console.log('%c  initializeBalanceChain() - Check and repair if needed', 'color: #8B5CF6;');
+console.log('%c  recalculateAllMonthlyBalances() - Recalculate all monthly balances', 'color: #8B5CF6;');
+console.log('%c  recalculateTransactionsAfter(date, createdAt) - Recalculate transactions after a date', 'color: #8B5CF6;');
 console.log('%c💡 Balance chain ensures Saldo Awal = Previous Month\'s Saldo Akhir', 'color: #F59E0B;');
 
 // Calculate account balances for a specific month
@@ -487,29 +481,12 @@ const calculateMonthlyAccountBalances = async (year, month) => {
         // Process transactions and calculate balances
         transactionsSnapshot.forEach(doc => {
             const transaction = doc.data();
-            const categoryId = transaction.categoryId;
             const accountId = transaction.accountId;
             const amount = transaction.amount || 0;
             
             if (accountBalances[accountId]) {
-                // Get category to determine transaction type
-                const category = getCategoryById(categoryId);
-                if (category) {
-                    let adjustedAmount = amount;
-                    
-                    if (category.index.startsWith('2')) {
-                        // Income - positive
-                        adjustedAmount = Math.abs(amount);
-                    } else if (category.index.startsWith('3')) {
-                        // Expense - negative
-                        adjustedAmount = -Math.abs(amount);
-                    } else {
-                        // Other categories (like Saldo Awal) - use as is
-                        adjustedAmount = amount;
-                    }
-                    
-                    accountBalances[accountId].total += adjustedAmount;
-                }
+                // Amount is already stored with correct sign (positive or negative)
+                accountBalances[accountId].total += amount;
             }
         });
         
@@ -689,6 +666,178 @@ const getMonthActualEndingBalance = async (year, month) => {
     }
 };
 
+// Recalculate saldoKas for all transactions after a specific date
+const recalculateTransactionsAfter = async (afterDate, afterCreatedAt) => {
+    try {
+        console.log('Starting recalculation of transactions after:', afterDate);
+        
+        const afterTimestamp = firebase.firestore.Timestamp.fromDate(new Date(afterDate));
+        
+        // Get all transactions after this date (including same date but later createdAt)
+        const allTransactionsQuery = await db.collection('transactions')
+            .where('date', '>=', afterTimestamp)
+            .orderBy('date', 'asc')
+            .orderBy('createdAt', 'asc')
+            .get();
+        
+        if (allTransactionsQuery.empty) {
+            console.log('No transactions to recalculate');
+            return;
+        }
+        
+        let transactionsToUpdate = [];
+        
+        allTransactionsQuery.forEach(doc => {
+            const transaction = { id: doc.id, ...doc.data() };
+            const transactionDate = transaction.date.toDate();
+            const transactionCreatedAt = transaction.createdAt?.toDate();
+            
+            // Skip the transaction that was just added (same date and createdAt)
+            const isSameDate = transactionDate.getTime() === new Date(afterDate).getTime();
+            const isSameCreatedAt = afterCreatedAt && transactionCreatedAt && 
+                                   Math.abs(transactionCreatedAt.getTime() - afterCreatedAt.getTime()) < 1000;
+            
+            if (isSameDate && isSameCreatedAt) {
+                console.log('Skipping the newly added transaction:', transaction.id);
+                return; // Skip this one
+            }
+            
+            transactionsToUpdate.push(transaction);
+        });
+        
+        console.log(`Found ${transactionsToUpdate.length} transactions to recalculate`);
+        
+        // Recalculate each transaction's saldoKas
+        for (const transaction of transactionsToUpdate) {
+            const transactionDate = transaction.date.toDate ? transaction.date.toDate() : new Date(transaction.date);
+            
+            // Get the previous balance for this transaction
+            const previousBalance = await getPreviousSaldoKas(transactionDate);
+            
+            // Calculate new saldoKas
+            const newSaldoKas = previousBalance + transaction.amount;
+            
+            console.log(`Updating transaction ${transaction.id}: ${formatCurrency(previousBalance)} + ${formatCurrency(transaction.amount)} = ${formatCurrency(newSaldoKas)}`);
+            
+            // Update the transaction in Firestore
+            await db.collection('transactions').doc(transaction.id).update({
+                saldoKas: newSaldoKas,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        console.log('Recalculation completed');
+        
+        // After recalculating transactions, update all affected monthly balances
+        await recalculateAllMonthlyBalances();
+        
+    } catch (error) {
+        console.error('Error recalculating transactions:', error);
+    }
+};
+
+// Recalculate all monthly balances based on actual transactions
+const recalculateAllMonthlyBalances = async () => {
+    try {
+        console.log('Recalculating all monthly balances...');
+        
+        // Get all transactions grouped by month
+        const allTransactionsSnapshot = await db.collection('transactions')
+            .orderBy('date', 'asc')
+            .orderBy('createdAt', 'asc')
+            .get();
+        
+        if (allTransactionsSnapshot.empty) {
+            console.log('No transactions to process');
+            return;
+        }
+        
+        // Group transactions by month
+        const monthlyTransactions = new Map();
+        
+        allTransactionsSnapshot.forEach(doc => {
+            const transaction = { id: doc.id, ...doc.data() };
+            const transactionDate = transaction.date.toDate();
+            const year = transactionDate.getFullYear();
+            const month = transactionDate.getMonth() + 1; // 1-12
+            const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+            
+            if (!monthlyTransactions.has(monthKey)) {
+                monthlyTransactions.set(monthKey, []);
+            }
+            
+            monthlyTransactions.get(monthKey).push(transaction);
+        });
+        
+        // Sort months chronologically
+        const sortedMonthKeys = Array.from(monthlyTransactions.keys()).sort();
+        
+        let previousEndingBalance = 0;
+        
+        // Update each month's balance
+        for (let i = 0; i < sortedMonthKeys.length; i++) {
+            const monthKey = sortedMonthKeys[i];
+            const [year, month] = monthKey.split('-').map(Number);
+            const transactions = monthlyTransactions.get(monthKey);
+            
+            // For the first month, check if there's a previous month's balance document
+            let startingBalance = previousEndingBalance;
+            if (i === 0) {
+                // Check previous month's document
+                const prevMonth = month === 1 ? 12 : month - 1;
+                const prevYear = month === 1 ? year - 1 : year;
+                const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+                
+                console.log(`🔍 First month ${monthKey}: Checking for previous month document ${prevMonthKey}...`);
+                const prevMonthDoc = await db.collection('monthlyBalances').doc(prevMonthKey).get();
+                
+                if (prevMonthDoc.exists) {
+                    const prevData = prevMonthDoc.data();
+                    startingBalance = prevData.endingBalance || 0;
+                    console.log(`✅ Found ${prevMonthKey} with endingBalance: ${formatCurrency(startingBalance)}`);
+                } else {
+                    console.log(`❌ Previous month document ${prevMonthKey} does NOT exist!`);
+                }
+            }
+            
+            // Ending balance = last transaction's saldoKas
+            const lastTransaction = transactions[transactions.length - 1];
+            const endingBalance = lastTransaction.saldoKas || 0;
+            
+            // Calculate account balances
+            const accountBalances = await calculateMonthlyAccountBalances(year, month);
+            
+            // Update the monthly balance document
+            const monthlyBalanceData = {
+                year: year,
+                month: month,
+                startingBalance: startingBalance,
+                endingBalance: endingBalance,
+                accountBalances: accountBalances,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            await db.collection('monthlyBalances').doc(monthKey).set(monthlyBalanceData);
+            
+            console.log(`💾 Saved ${monthKey}: startingBalance=${formatCurrency(startingBalance)}, endingBalance=${formatCurrency(endingBalance)}`);
+            
+            // Update for next month
+            previousEndingBalance = endingBalance;
+        }
+        
+        console.log('All monthly balances recalculated successfully');
+        
+    } catch (error) {
+        console.error('Error recalculating monthly balances:', error);
+    }
+};
+
+// Expose functions globally for manual use and debugging
+window.fixBalanceChain = fixBalanceChain;
+window.initializeBalanceChain = initializeBalanceChain;
+window.recalculateAllMonthlyBalances = recalculateAllMonthlyBalances;
+window.recalculateTransactionsAfter = recalculateTransactionsAfter;
+
 const checkAndSavePreviousMonthBalance = async () => {
     try {
         const now = new Date();
@@ -746,10 +895,21 @@ const handleTransactionSubmit = async (event) => {
     const form = event.target;
     const submitButton = form.querySelector('button[type="submit"]');
     
+    // Get the transaction type selection
+    const transactionType = document.getElementById('transactionType').value;
+    let amount = parseFloat(document.getElementById('amount').value) || 0;
+    
+    // Apply the sign based on transaction type
+    if (transactionType === 'positive') {
+        amount = Math.abs(amount);
+    } else if (transactionType === 'negative') {
+        amount = -Math.abs(amount);
+    }
+    
     const transactionData = {
         name: document.getElementById('transactionName').value.trim(),
         date: document.getElementById('transactionDate').value,
-        amount: parseFloat(document.getElementById('amount').value) || 0,
+        amount: amount,
         accountId: document.getElementById('accountId').value,
         description: document.getElementById('description').value.trim(),
         categoryId: getSelectedCategoryId(),
@@ -770,7 +930,7 @@ const handleTransactionSubmit = async (event) => {
         return;
     }
     
-    if (transactionData.amount <= 0) {
+    if (amount === 0) {
         alert('Jumlah transaksi harus lebih dari 0');
         return;
     }
@@ -785,11 +945,19 @@ const handleTransactionSubmit = async (event) => {
         return;
     }
     
+    if (!transactionType) {
+        alert('Jenis transaksi (Positif/Negatif) harus dipilih');
+        return;
+    }
+    
     // Disable submit button
     submitButton.disabled = true;
     submitButton.textContent = 'Menyimpan...';
     
     try {
+        // Store the original date before converting to timestamp
+        const transactionDateString = transactionData.date;
+        
         const calculatedSaldoKas = await calculateSaldoKas(transactionData);
         transactionData.saldoKas = calculatedSaldoKas;
         transactionData.date = firebase.firestore.Timestamp.fromDate(new Date(transactionData.date));
@@ -798,10 +966,18 @@ const handleTransactionSubmit = async (event) => {
         
         console.log('Transaction added with ID:', docRef.id);
         
-        alert('Transaksi berhasil disimpan!');
+        // Get the createdAt timestamp for this transaction
+        const addedDoc = await docRef.get();
+        const addedTransaction = addedDoc.data();
+        const createdAt = addedTransaction.createdAt?.toDate();
         
-        await updateMonthlyBalance(transactionData);
-        await checkAndSavePreviousMonthBalance();
+        // Show loading message
+        submitButton.textContent = 'Menghitung ulang...';
+        
+        // Recalculate all transactions after this one
+        await recalculateTransactionsAfter(transactionDateString, createdAt);
+        
+        alert('Transaksi berhasil disimpan dan semua saldo telah diperbarui!');
         
         form.reset();
         resetCategorySelectors();
@@ -1058,6 +1234,9 @@ const handleNavigation = () => {
         });
     }
 };
+
+// Expose initializeTransactionForm globally for auth system
+window.initializeTransactionForm = initializeTransactionForm;
 
 // Initialize when DOM is ready - but only call handleNavigation
 // initializeTransactionForm will be called by auth system
