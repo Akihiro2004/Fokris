@@ -143,25 +143,9 @@ const generateExtractData = async (startMonth, endMonth) => {
                 categoryData[categoryId].accounts[accountId] = 0;
             }
             
-            // Add amount to the appropriate account
-            // Handle income/expense logic
-            const category = getCategoryById(categoryId);
-            if (category) {
-                let adjustedAmount = amount;
-                
-                if (category.index.startsWith('2')) {
-                    // Income - positive
-                    adjustedAmount = Math.abs(amount);
-                } else if (category.index.startsWith('3')) {
-                    // Expense - negative  
-                    adjustedAmount = -Math.abs(amount);
-                } else {
-                    // Other categories (like Saldo Awal) - use as is
-                    adjustedAmount = amount;
-                }
-                
-                categoryData[categoryId].accounts[accountId] += adjustedAmount;
-            }
+            // Amount is already stored with correct sign (positive or negative)
+            // No need to adjust based on category - use the amount as stored
+            categoryData[categoryId].accounts[accountId] += amount;
         }
     });
     
